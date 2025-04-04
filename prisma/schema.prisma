@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Localizacao {
+  uuid      String    @id @default(uuid())
+  Lat       String? // Campo opcional, permite null
+  Lng       String? // Campo opcional, permite null
+  estado    Estado?
+  municipio String? // Campo opcional, permite null
+  Usuario   Usuario[]
+}
+
+enum Estado {
+  AC
+  AL
+  AP
+  AM
+  BA
+  CE
+  DF
+  ES
+  GO
+  MA
+  MG
+  MS
+  MT
+  PA
+  PB
+  PE
+  PI
+  PR
+  RJ
+  RN
+  RO
+  RR
+  RS
+  SC
+  SE
+  SP
+  TO
+}
+
+model Usuario {
+  uuid            String        @id @default(uuid())
+  nome            String
+  imagem_url      String?
+  idade           Int
+  sexo            Sexo?         @default(M)
+  localizacao_id  String?
+  localizacao     Localizacao?  @relation(fields: [localizacao_id], references: [uuid])
+  ChatHasChat     ChatHasChat[]
+  autenticacao_id String        @unique
+  autenticacao    Autenticacao  @relation(fields: [autenticacao_id], references: [uuid], onDelete: Cascade)
+  Blocks          Block[] // Relacionamento para ver quem o usuário bloqueou
+}
+
+model Block {
+  uuid          String  @id @default(uuid())
+  usuarioUuid   String // ID de quem bloqueou
+  blockedUserId String // ID do usuário bloqueado
+  blockedUser   Usuario @relation(fields: [blockedUserId], references: [uuid], onDelete: Cascade)
+
+  @@unique([usuarioUuid, blockedUserId]) // Impede bloqueios duplicados
+}
+
+model Autenticacao {
+  uuid     String   @id @default(uuid())
+  email    String   @unique
+  password String
+  Usuario  Usuario?
+}
+
+enum Sexo {
+  F
+  M
+}
+
+model Chat {
+  uuid            String        @id @default(uuid())
+  createdAt       DateTime      @default(now())
+  lastDateMensage DateTime?
+  mensagens       Menssagem[]
+  participantes   ChatHasChat[]
+}
+
+model ChatHasChat {
+  chat_idtable1 String
+  chat_uuid     String
+  chat          Chat    @relation(fields: [chat_idtable1], references: [uuid], onDelete: Cascade)
+  usuario       Usuario @relation(fields: [chat_uuid], references: [uuid], onDelete: Cascade)
+
+  @@id([chat_idtable1, chat_uuid])
+}
+
+model Menssagem {
+  uuid       String   @id @default(uuid())
+  text       String
+  type       Tipo?    @default(T)
+  url        String?
+  chat_uuid  String
+  createdAt  DateTime @default(now())
+  sender_id  String
+  recieve_id String
+  chat       Chat     @relation(fields: [chat_uuid], references: [uuid])
+}
+
+enum Tipo {
+  A
+  T
+  I
+}

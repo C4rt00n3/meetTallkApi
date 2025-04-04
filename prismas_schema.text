@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Localizacao {
+  id        Int     @id
+  Lat       Float?  // Optional field, allows null
+  Lng       Float?  // Optional field, allows null
+  estado    Estado
+  municipio String? // Optional field, allows null
+  Usuario   Usuario[]
+}
+
+enum Estado {
+  AC
+  AL
+  AP
+  AM
+  BA
+  CE
+  DF
+  ES
+  GO
+  MA
+}
+
+model Autenticacao {
+  id        Int    @id
+  email     String @unique
+  passowrd  String
+  Usuario   Usuario?
+}
+
+model Usuario {
+  uuid               Int         @id
+  nome               String      @unique
+  imagem_url         String?     @unique
+  email              String      @unique
+  idede              Int
+  sexo               Sexo?       @default(M)
+  localizacao_id     Int
+  table1_id          Int
+  localizacao        Localizacao @relation(fields: [localizacao_id], references: [id])
+  autenticacao       Autenticacao @relation(fields: [table1_id], references: [id])
+  ChatHasChat        ChatHasChat[]
+}
+
+enum Sexo {
+  F
+  M
+}
+
+model Chat {
+  uuid           Int            @id
+  user_name      String?        @unique
+  user_id        Int?           @unique
+  ChatHasChat    ChatHasChat[]
+}
+
+model ChatHasChat {
+  chat_idtable1  Int
+  chat_uuid      Int
+  chat           Chat           @relation(fields: [chat_idtable1], references: [uuid])
+  usuario        Usuario        @relation(fields: [chat_uuid], references: [uuid])
+
+  @@id([chat_idtable1, chat_uuid])
+}
+
+model Messagem {
+  uuid      Int       @id
+  text      String
+  type      Tipo?     @default(T)
+  url       String?
+  chat_uuid Int
+  chat      Chat      @relation(fields: [chat_uuid], references: [uuid])
+}
+
+enum Tipo {
+  A
+  T
+  I
+}
