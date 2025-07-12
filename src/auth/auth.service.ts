@@ -1,14 +1,14 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { CraeteLogin } from './dto/created.login';
 import { JwtService } from '@nestjs/jwt';
-import { UsuarioService } from 'src/usuario/usuario.service';
-import { UsuarioEntity } from 'src/usuario/entities/usuario.entity';
+import { UserService } from 'src/user/user.service';
+import { UserEntity } from 'src/user/entities/user.entity';
+import { CreateLoginDto } from './dto/created.login';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly usersService: UsuarioService,
+    private readonly usersService: UserService,
     private jwtService: JwtService
   ) { }
 
@@ -19,15 +19,15 @@ export class AuthService {
  * @param {string} param0.email - O email do usuário.
  * @param {string} param0.password - A senha do usuário.
  *
- * @returns {Promise<{ access_token: string; user: UsuarioEntity }>} 
+ * @returns {Promise<{ access_token: string; user: UserEntity }>} 
  * Um objeto contendo o token de acesso e os dados do usuário autenticado.
  *
  * @throws {NotFoundException} Se o usuário não for encontrado.
  * @throws {UnauthorizedException} Se a senha estiver incorreta ou o usuário não for autenticado.
  */
-  async signIn({ email, password }: CraeteLogin): Promise<{ access_token: string; user: UsuarioEntity }> {
+  async signIn({ email, password }: CreateLoginDto): Promise<{ access_token: string; user: UserEntity }> {
     const user = await this.usersService.findByEmail(email);
-    const autenticacao = user?.autenticacao;
+    const autenticacao = user?.auth;
 
     if (!user || !autenticacao) {
       throw new NotFoundException("Usuário não encontrado");

@@ -1,10 +1,10 @@
 import { Body, Controller, Post, HttpCode, HttpStatus, UseGuards, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CraeteLogin } from './dto/created.login';
 import { AuthGuard } from './auth.guard';
 import { GetUser } from './get-user.decorator';
 import { ApiTags } from '@nestjs/swagger';
-import { Usuario } from '@prisma/client';
+import { User } from '@prisma/client';
+import { CreateLoginDto } from './dto/created.login';
 
 @ApiTags("Login")
 @Controller('auth')
@@ -13,14 +13,14 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  signIn(@Body() signInDto: CraeteLogin) {
+  signIn(@Body() signInDto: CreateLoginDto) {
     return this.authService.signIn(signInDto);
   }
 
   @HttpCode(HttpStatus.OK)
   @Get('authentication')
   @UseGuards(AuthGuard)
-  async validateToken(@GetUser() user: Usuario) {
+  async validateToken(@GetUser() user: User) {
     return user;
   }
 }

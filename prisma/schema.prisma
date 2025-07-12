@@ -7,16 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Localizacao {
-  uuid      String    @id @default(uuid())
-  Lat       String? // Campo opcional, permite null
-  Lng       String? // Campo opcional, permite null
-  estado    Estado?
-  municipio String? // Campo opcional, permite null
-  Usuario   Usuario[]
+model Location {
+  uuid      String  @id @default(uuid())
+  latitude  String? @map("lat")
+  longitude String? @map("lng")
+  state     String? @map("estado")
+  city      String? @map("municipio")
+  country   String?
+  users     User[]
+
+  @@map("localizacao")
 }
 
-enum Estado {
+enum State {
   AC
   AL
   AP
@@ -46,72 +49,125 @@ enum Estado {
   TO
 }
 
-model Usuario {
-  uuid            String        @id @default(uuid())
-  nome            String
-  imagem_url      String?
-  idade           Int
-  sexo            Sexo?         @default(M)
-  localizacao_id  String?
-  localizacao     Localizacao?  @relation(fields: [localizacao_id], references: [uuid])
-  ChatHasChat     ChatHasChat[]
-  autenticacao_id String        @unique
-  autenticacao    Autenticacao  @relation(fields: [autenticacao_id], references: [uuid], onDelete: Cascade)
-  Blocks          Block[] // Relacionamento para ver quem o usuário bloqueou
+model User {
+  uuid             String            @id @default(uuid())
+  name             String            @map("nome")
+  age              Int               @map("idade")
+  gender           Gender?           @default(M) @map("sexo")
+  locationId       String?           @map("localizacao_id")
+  location         Location?         @relation(fields: [locationId], references: [uuid])
+  chatParticipants ChatParticipant[]
+  authId           String            @unique @map("autenticacao_id")
+  auth             Auth              @relation(fields: [authId], references: [uuid])
+  blocks           Block[]
+  profileImages    ImageProfile[]
+  messageImages    ImageMessage[]
+  preference       Preference?        @relation(fields: [preferenceUuid], references: [uuid])
+  preferenceUuid   String? @unique
+
+  @@map("usuario")
+}
+
+model Preference {
+  uuid   String @id @default(uuid())
+  gender Gender
+  maxAge Int
+  user User[]
 }
 
 model Block {
   uuid          String  @id @default(uuid())
-  usuarioUuid   String // ID de quem bloqueou
-  blockedUserId String // ID do usuário bloqueado
-  blockedUser   Usuario @relation(fields: [blockedUserId], references: [uuid], onDelete: Cascade)
+  userId        String?
+  blockedUserId String
+  blockedUser   User    @relation(fields: [blockedUserId], references: [uuid], onDelete: Cascade)
 
-  @@unique([usuarioUuid, blockedUserId]) // Impede bloqueios duplicados
+  @@unique([userId, blockedUserId])
 }
 
-model Autenticacao {
-  uuid     String   @id @default(uuid())
-  email    String   @unique
+model Auth {
+  uuid     String @id @default(uuid())
+  email    String @unique
   password String
-  Usuario  Usuario?
+  user     User?
+
+  @@map("autenticacao")
 }
 
-enum Sexo {
+enum Gender {
   F
   M
 }
 
 model Chat {
-  uuid            String        @id @default(uuid())
-  createdAt       DateTime      @default(now())
-  lastDateMensage DateTime?
-  mensagens       Menssagem[]
-  participantes   ChatHasChat[]
+  uuid            String            @id @default(uuid())
+  createdAt       DateTime          @default(now())
+  lastMessageDate DateTime?         @map("lastDateMessage")
+  fav             Boolean           @default(false)
+  messages        Message[]
+  participants    ChatParticipant[]
+
+  @@map("chat")
 }
 
-model ChatHasChat {
-  chat_idtable1 String
-  chat_uuid     String
-  chat          Chat    @relation(fields: [chat_idtable1], references: [uuid], onDelete: Cascade)
-  usuario       Usuario @relation(fields: [chat_uuid], references: [uuid], onDelete: Cascade)
+model ChatParticipant {
+  chatId String
+  userId String
 
-  @@id([chat_idtable1, chat_uuid])
+  chat Chat @relation(fields: [chatId], references: [uuid], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+
+  @@id([chatId, userId])
+  @@map("chat_participant")
 }
 
-model Menssagem {
-  uuid       String   @id @default(uuid())
-  text       String
-  type       Tipo?    @default(T)
-  url        String?
-  chat_uuid  String
-  createdAt  DateTime @default(now())
-  sender_id  String
-  recieve_id String
-  chat       Chat     @relation(fields: [chat_uuid], references: [uuid])
+model Message {
+  uuid           String       @id @default(uuid())
+  text           String
+  type           MessageType? @default(TEXT) @map("tipo")
+  url            String?
+  chatId         String       @map("chat_uuid")
+  createdAt      DateTime     @default(now())
+  senderId       String       @map("sender_id")
+  receiverId     String?      @map("receive_id")
+  chat           Chat         @relation(fields: [chatId], references: [uuid])
+  isRead         Boolean      @default(false)
+  deletedLocally Boolean      @default(false)
+
+  replyToId String?   @map("resposta_a_id")
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [uuid])
+  replies   Message[] @relation("MessageReplies")
+  isUpdate  Boolean   @default(false)
+  updateAt  DateTime? @updatedAt
+
+  countUpdate Int @default(0)
+
+  @@map("message")
 }
 
-enum Tipo {
-  A
-  T
-  I
+enum MessageType {
+  AUDIO
+  TEXT
+  IMAGE
+
+  @@map("tipo")
+}
+
+model ImageProfile {
+  uuid     String  @id @default(uuid())
+  src      Bytes
+  user     User?   @relation(fields: [userUuid], references: [uuid])
+  userUuid String?
+
+  isPrimary Boolean @default(false)
+
+  @@map("image_perfil")
+}
+
+model ImageMessage {
+  uuid     String  @id @default(uuid())
+  src      Bytes
+  user     User?   @relation(fields: [userUuid], references: [uuid])
+  userUuid String?
+
+  @@map("image_message")
 }

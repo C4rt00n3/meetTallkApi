@@ -5,7 +5,7 @@ import { UpdateChatDto } from './dto/update-chat.dto';
 import { IPaginationOptions } from 'nestjs-typeorm-paginate';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/get-user.decorator';
-import { Usuario } from '@prisma/client';
+import { User } from '@prisma/client';
 
 @Controller('chat')
 export class ChatController {
@@ -14,7 +14,7 @@ export class ChatController {
   @Get()
   @UseGuards(AuthGuard)
   findAll(
-    @GetUser() user: Usuario,
+    @GetUser() user: User,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 30,
     @Query("nome") nome: string
@@ -26,13 +26,21 @@ export class ChatController {
       nome
     );
   }
+  
   @Get(':id')
-  findOne(@Param('id') id: string, @GetUser() user: Usuario) {
+  @UseGuards(AuthGuard)
+  findOne(@Param('id') id: string, @GetUser() user: User) {
     return this.chatService.findOne(id, user);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.chatService.remove(id);
+  }
+
+  @Patch(":uuid")
+  @UseGuards(AuthGuard)
+  markFav(@Param('uuid') uuid: string, @GetUser() user: User) {
+    return this.chatService.markFav(uuid, user)
   }
 }

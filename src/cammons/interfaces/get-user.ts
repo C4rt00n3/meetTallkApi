@@ -1,5 +1,5 @@
-import { Usuario } from "@prisma/client";
+import { User } from "@prisma/client";
 
-export interface IGetUser extends  Omit<Usuario, "password">  {
+export interface IGetUser extends  Omit<User, "password">  {
 
 }

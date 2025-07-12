@@ -1,12 +1,11 @@
-import { Block, Usuario } from "@prisma/client";
-import { CreateBlockDto } from "../dto/create-block.dto";
+import { Block, User } from "@prisma/client";
 
 export abstract class BlockProvider {
-    abstract create(createBlockDto: CreateBlockDto, user: Usuario): Promise<Block | null>;
+    abstract create(userId: string, user: User): Promise<Block | null>;
 
-    abstract findAll(user: Usuario): Promise<Block[]>;
+    abstract findAll(user: User, page: number, size: number): Promise<Block[]>;
 
-    abstract findOne(id: string, user: Usuario): Promise<Block | null>;
+    abstract findOne(id: string, user: User): Promise<Block | null>;
 
-    abstract remove( id: string, user: Usuario): Promise<void>;
+    abstract remove(userId: string, user: User): Promise<void>;
 }

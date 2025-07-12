@@ -1,8 +1,11 @@
-import { Usuario, Chat } from "@prisma/client";
 import { IPaginationOptions } from "nestjs-typeorm-paginate";
 import ChatProvider from "../chat.provider";
 import { PrismaService } from "src/prisma.service";
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { WebSocketServer } from "@nestjs/websockets";
+import { Server } from 'socket.io';
+import { Chat, User } from "@prisma/client";
+import { error } from "console";
 
 /**
  * Classe responsável por gerenciar operações relacionadas ao modelo Chat utilizando o PrismaService.
@@ -10,6 +13,7 @@ import { Injectable } from "@nestjs/common";
  */
 @Injectable()
 export class ChatClass implements ChatProvider {
+    @WebSocketServer() server: Server;
 
     /**
      * Construtor da classe ChatClass
@@ -23,19 +27,19 @@ export class ChatClass implements ChatProvider {
      * @param options - Opções de paginação (não utilizadas atualmente no método).
      * @returns Uma lista de chats nos quais o usuário é participante.
      */
-    async findAll(user: Usuario, { page, limit }: IPaginationOptions, nome: string): Promise<Chat[]> {
+    async findAll(user: User, { page, limit }: IPaginationOptions, name: string): Promise<Chat[]> {
         const pageNumber = Number(page) || 1;
         const limitNumber = Number(limit) || 10;
-    
+
         return await this.prisma.chat.findMany({
             where: {
                 AND: [
-                    { participantes: { some: { usuario: { uuid: user.uuid } } } },
+                    { participants: { some: { user: { uuid: user.uuid } } } },
                     {
-                        participantes: {
+                        participants: {
                             some: {
-                                usuario: {
-                                    nome: { contains: nome.trim()}
+                                user: {
+                                    name: { contains: name.trim() }
                                 }
                             }
                         }
@@ -43,14 +47,21 @@ export class ChatClass implements ChatProvider {
                 ]
             },
             include: {
-                participantes: { include: { usuario: true } },
-                mensagens: true
+                participants: { include: { user: {
+                    include: {
+                        profileImages: {
+                            select: {
+                                uuid: true
+                            }
+                        }
+                    }
+                } } },
+                messages: true
             },
             take: limitNumber,
             skip: (pageNumber - 1) * limitNumber
         });
     }
-    
 
     /**
      * Busca um chat específico pelo UUID, garantindo que o usuário seja participante.
@@ -58,21 +69,35 @@ export class ChatClass implements ChatProvider {
      * @param user - Usuário atual que deve ser um participante do chat.
      * @returns O chat encontrado ou null se não existir ou o usuário não for participante.
      */
-    async findOne(uuid: string, user: Usuario): Promise<Chat | null> {
-        return await this.prisma.chat.findFirst({
+    async findOne(uuid: string, user: User): Promise<Chat> {
+        const chat = await this.prisma.chat.findFirst({
             where: {
                 uuid,
-                participantes: {
+                participants: {
                     some: {
-                        usuario: user
+                        user: user
                     }
                 }
             },
             include: {
-                participantes: { include: { usuario: true } },
-                mensagens: true
+                participants: { include: { user: {
+                    include: {
+                        profileImages: {
+                            select: {
+                                uuid: true
+                            }
+                        }
+                    }
+                } } },
+                messages: true
             }
         });
+
+        if (!chat) {
+            throw new NotFoundException("Não encontrado!");
+        }
+
+        return chat;
     }
 
     /**
@@ -81,16 +106,42 @@ export class ChatClass implements ChatProvider {
      * @param user - Usuário atual que deve ser um participante do chat.
      * @throws Exceção se o chat não existir ou o usuário não for participante.
      */
-    async remove(uuid: string, user: Usuario): Promise<void> {
+    async remove(uuid: string, user: User): Promise<void> {
         await this.prisma.chat.delete({
             where: {
                 uuid,
-                participantes: {
+                participants: {
                     some: {
-                        usuario: user
+                        user: user
                     }
                 }
             }
         });
+    }
+
+    async markFav(uuid: string, user: User): Promise<User> {
+        const {fav} = await this.prisma.chat.findUniqueOrThrow({
+            where: {
+                uuid,
+                participants: {
+                    some: {
+                        user: user
+                    }
+                }
+            }
+        }).then(e => e).catch(_ => {throw new NotFoundException("Não encontrado!")})
+
+        return await this.prisma.chat.update({
+            where: {
+                uuid,
+            },
+            data: {
+                fav: !fav
+            },
+            include: {
+                participants: false,
+                messages: false
+            }
+        }) as unknown as User;
     }
 }

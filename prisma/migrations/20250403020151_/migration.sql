@@ -1,3 +1,0 @@
--- AlterTable
-ALTER TABLE `menssagem` ADD COLUMN `lastDateMensage` DATETIME(3) NULL,
-    MODIFY `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3);

@@ -1,25 +1,24 @@
 import { Injectable } from '@nestjs/common';
-import { CreateBlockDto } from './dto/create-block.dto';
-import { Usuario } from '@prisma/client';
+import { User } from '@prisma/client';
 import { BlockProvider } from './provider/block.provider';
 
 @Injectable()
 export class BlockService {
   constructor(private readonly provider: BlockProvider) {}
    
-  create(createBlockDto: CreateBlockDto, user: Usuario) {
-    return this.provider.create(createBlockDto, user);
+  create(userId: string, user: User) {
+    return this.provider.create(userId, user);
   }
 
-  findAll(user: Usuario) {
-    return this.provider.findAll(user)
+  findAll(user: User, page: number, size: number) {
+    return this.provider.findAll(user, page, size)
   }
 
-  findOne(id: string, user: Usuario) {
+  findOne(id: string, user: User) {
     return this.provider.findOne(id, user)
   }
 
-  remove(id: string, user: Usuario) {
-    return this.provider.remove(id, user);
+  remove(userId: string, user: User) {
+    return this.provider.remove(userId, user);
   }
 }

@@ -15,5 +15,6 @@ import { ChatClass } from './provider/useClass/chat.useClass';
       useClass: ChatClass
     }
   ],
+  exports: [ChatService]
 })
 export class ChatModule { }

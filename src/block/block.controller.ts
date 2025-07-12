@@ -1,35 +1,41 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import { BlockService } from './block.service';
-import { CreateBlockDto } from './dto/create-block.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
-import { Usuario } from '@prisma/client';
+import { User } from '@prisma/client';
 import { GetUser } from 'src/auth/get-user.decorator';
 
 @Controller('block')
 export class BlockController {
   constructor(private readonly blockService: BlockService) { }
 
-  @Post()
+  @Post(":user_id")
   @UseGuards(AuthGuard)
-  create(@Body() createBlockDto: CreateBlockDto,@GetUser() user: Usuario) {
-    return this.blockService.create(createBlockDto, user);
+  create(@Param("user_id") userId: string, @GetUser() user: User) {
+    return this.blockService.create(userId, user);
   }
 
   @Get()
   @UseGuards(AuthGuard)
-  findAll(@GetUser() user: Usuario) {
-    return this.blockService.findAll(user);
+  findAll(
+    @GetUser() user: User,
+    @Query("page") page?: number,
+    @Query("size") size?: number,
+  ) {
+    return this.blockService.findAll(user, page || 1, size || 20);
   }
 
   @Get(':id')
   @UseGuards(AuthGuard)
-  findOne(@Param('id') id: string, @GetUser() user: Usuario) {
+  findOne(
+    @Param('id') id: string,
+    @GetUser() user: User
+  ) {
     return this.blockService.findOne(id, user);
   }
 
-  @Delete(':id')
+  @Delete(':user_id')
   @UseGuards(AuthGuard)
-  remove(@Param('id') id: string, @GetUser() user: Usuario) {
-    return this.blockService.remove(id, user);
+  remove(@Param('user_id') userId: string, @GetUser() user: User) {
+    return this.blockService.remove(userId, user);
   }
 }
