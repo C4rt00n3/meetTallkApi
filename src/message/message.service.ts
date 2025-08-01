@@ -8,8 +8,12 @@ import { UpdateMessageDto } from './dto/update-message.dto';
 export class MessageService {
   constructor(private readonly provider: MessageProvider) {}
 
-  create(createMensageDto: CreateMessageDto, user: User) {
-    return this.provider.create(createMensageDto, user)
+  create(
+    createMensageDto: CreateMessageDto, 
+    user: User,
+    file?: Express.Multer.File | null,
+  ) {
+    return this.provider.create(createMensageDto, user, file)
   }
 
   findAll(user: User) {
@@ -38,5 +42,9 @@ export class MessageService {
 
   async listMessagUpdated(user: User):  Promise<Array<Message>> {
     return await this.provider.listMessagUpdated(user)
+  }
+
+  getImageMessage(uuid: string, chat_uuid: string, user: User) {
+    return this.provider.getImageMessage(uuid, chat_uuid, user)
   }
 }

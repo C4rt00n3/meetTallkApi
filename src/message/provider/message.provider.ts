@@ -1,10 +1,9 @@
 import { CreateMessageDto } from "../dto/create-message.dto";
 import { Chat, Message, User } from "@prisma/client";
 import { UpdateMessageDto } from "../dto/update-message.dto";
-import { promises } from "dns";
 
 export abstract class MessageProvider {
-    abstract create(createMensageDto: CreateMessageDto, user: User): Promise<Message | null>;
+    abstract create(createMensageDto: CreateMessageDto, user: User, file?: Express.Multer.File | null): Promise<Message | null>;
 
     abstract update(id: string, updateMessageDto: UpdateMessageDto, user: User): Promise<Message | null>;
 
@@ -19,4 +18,6 @@ export abstract class MessageProvider {
     abstract messageNotRead(user: User): Promise<Message[]>
 
     abstract listMessagUpdated(user: User): Promise<Array<Message>>
+    
+    abstract getImageMessage(uuid: string, chat_uuid: string, user: User): any
 }

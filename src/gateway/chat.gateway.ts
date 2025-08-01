@@ -1,19 +1,19 @@
-import { Logger, Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { Logger, Injectable, NotFoundException } from '@nestjs/common';
 import { SubscribeMessage, WebSocketGateway, WebSocketServer, OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from 'src/prisma.service';
 import { ChatEntity } from 'src/chat/entities/chat.entity';
-import { MessageService } from 'src/message/message.service';
-import { Message, User } from '@prisma/client';
+import { Chat, ImageProfile, Message, User } from '@prisma/client';
 import { UserEntity } from 'src/user/entities/user.entity';
+import * as jwt from 'jsonwebtoken'; // Importe a biblioteca jsonwebtoken diretamente
 
 
 @Injectable()
 @WebSocketGateway()
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
-  private logger: Logger = new Logger('ChatGateway');
+  private readonly logger: Logger = new Logger('ChatGateway');
   userConnections = new Map<string, Set<string>>(); // userId => Set<socketId>
 
   constructor(
@@ -56,22 +56,28 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     });
   }
 
-  async chatsIds(user: User): Promise<string[]> {
-    const chats = await this.prisma.chat.findMany({
-      where: {
-        participants: {
-          some: {
-            userId: user.uuid,
-          },
+  async chatsIdsWithUnreadyMessages(user: User): Promise<any> {
+  const chats = await this.prisma.chat.findMany({
+    where: {
+      participants: {
+        some: {
+          userId: user.uuid,
         },
       },
-      select: {
-        uuid: true,
+      messages: {
+        some: {
+          isRead: false,
+        },
       },
-    });
+    },
+    include:{
+      participants: true,
+      messages: true
+    }
+  });
 
-    return chats.map(chat => chat.uuid);
-  }
+  return { chats };
+}
 
   /**
     * Busca um usuário pelo endereço de e-mail associado à autenticação.
@@ -123,8 +129,8 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync(token, { secret: process.env.SECRET_KEY });
-      const user = await this.findByEmail(payload.email);
+      const payload: any = jwt.decode(token);
+      const user = await this.findByEmail(payload?.email || "");
 
       if (!user) {
         this.logger.warn('User not found');
@@ -135,20 +141,15 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       client.data.userId = user.uuid;
       client.data.user = user;
 
-      const idsChats = await this.chatsIds(user);
+      const idsChats = await this.chatsIdsWithUnreadyMessages(user as unknown as User);
       client.emit("idsChats", idsChats);
 
-      const chatsNotRead = await this.messageNotRead(user);
-      if (chatsNotRead.length > 0) {
-        client.emit('initialData', chatsNotRead);
-      }
-
-      const messagesdeleted = await this.listMessageRemoved(user)
+      const messagesdeleted = await this.listMessageRemoved(user as unknown as User)
 
       if (messagesdeleted.length > 0)
         client.emit("listMessageRemoved", messagesdeleted)
 
-      const listMessagesUpdated = await this.listMessagUpdated(user)
+      const listMessagesUpdated = await this.listMessagUpdated(user as unknown as User)
       if (listMessagesUpdated.length > 0)
         client.emit("listMessagesUpdated", listMessagesUpdated)
 
@@ -331,4 +332,101 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     return messages
   }
 
+  /**
+   * Notifica os contatos/participantes de chats de um usuário sobre uma atualização no perfil dele.
+   * @param uuid uuid do usuário.
+   * @param action A ação que ocorreu (ex: 'update').
+   */
+  async notifyContactsOfUserUpdate(uuid: string, action: 'update' | 'create' | 'delete', {src, ...data}: any) {
+    console.log(`Atualizando user, ${uuid}`)
+    const chats = await this.prisma.chat.findMany({
+      where: {
+        participants: {
+          some: {
+            userId: uuid,
+          },
+        },
+      },
+      include: {
+        participants: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    console.log(chats)
+
+    const notifiedUsers = new Set<string>();
+
+    for (const chat of chats) {
+      for (const participant of chat.participants) {
+        const contactId = participant.userId;
+        if (contactId === uuid || notifiedUsers.has(contactId)) {
+          continue;
+        }
+        notifiedUsers.add(contactId);
+        const socketIds = this.userConnections.get(contactId);
+        if (socketIds) {
+          socketIds.forEach(socketId => {
+            const clientSocket = this.server.sockets.sockets.get(socketId);
+            if (clientSocket) {
+              clientSocket.emit('contactProfileUpdated', {
+                action: action,
+                userId: uuid,
+                data
+              });
+              this.logger.log(`'contactProfileUpdated' event emitted for contact ${contactId} about user ${uuid}.`);
+            }
+          });
+        }
+      }
+    }
+  }
+
+  async notifyContactsOfImageProfileUpdate(uuid: string, userId: string, action: 'update' | 'create' | 'delete', {src, ...data}: any) {
+    const chats = await this.prisma.chat.findMany({
+      where: {
+        participants: {
+          some: {
+            userId: userId,
+          },
+        },
+      },
+      include: {
+        participants: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    const notifiedUsers = new Set<string>();
+    for (const chat of chats) {
+      for (const participant of chat.participants) {
+        const contactId = participant.userId;
+        if (contactId === userId || notifiedUsers.has(contactId)) {
+          continue;
+        }
+        notifiedUsers.add(contactId);
+
+        const socketIds = this.userConnections.get(contactId);
+        if (socketIds) {
+          socketIds.forEach(socketId => {
+            const clientSocket = this.server.sockets.sockets.get(socketId);
+            if (clientSocket) {
+              clientSocket.emit('contactImageProfileUpdated', {
+                action: action,
+                userId: userId, 
+                data: { uuid, ...data}
+              });
+          this.logger.log(`'contactImageProfileUpdated' event emitted for contact ${contactId} about user ${userId}'s image.`);
+        }
+      });
+    }
+  }
+}
+  }
 }

@@ -1,15 +1,15 @@
-import { Body, Controller, Post, HttpCode, HttpStatus, UseGuards, Get } from '@nestjs/common';
+import { Body, Controller, Post, HttpCode, HttpStatus, UseGuards, Get, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { AuthGuard } from './auth.guard';
 import { GetUser } from './get-user.decorator';
 import { ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { CreateLoginDto } from './dto/created.login';
+import { AuthGuard } from './auth.guard';
 
 @ApiTags("Login")
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) { }
+  constructor(private readonly authService: AuthService) { }
 
   @HttpCode(HttpStatus.OK)
   @Post('login')
@@ -22,5 +22,11 @@ export class AuthController {
   @UseGuards(AuthGuard)
   async validateToken(@GetUser() user: User) {
     return user;
+  }
+
+  @Post('google')
+  @UseGuards(AuthGuard)
+  async auth(@Req() req: Request) { 
+    return this.authService.singInGoogle(req["user"])
   }
 }

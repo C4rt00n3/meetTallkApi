@@ -2,15 +2,15 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuard
 import { HashPasswordInterceptor } from './interceptor/password.interceptor ';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/get-user.decorator';
-import { UserEntity } from './entities/user.entity';
 import { CreateUserDto, GenericFilter, UpdateUserDto } from './dto/user.dto';
 import { User } from '@prisma/client';
 import { UserService } from './user.service';
+import { UserEntity } from './entities/user.entity';
 
 @Controller('user')
 export class UserController {
 
-    constructor(private service: UserService) { }
+    constructor(private readonly service: UserService) { }
 
     @Get(":uuid")
     @UseGuards(AuthGuard)
@@ -21,7 +21,7 @@ export class UserController {
     @Get()
     @UseGuards(AuthGuard)
     async findMay(
-        @GetUser() user: UserEntity,
+        @GetUser() user: User,
         @Query() { name, ...filter }: GenericFilter
     ) {
         return await this.service.findMany({ name }, user, filter)

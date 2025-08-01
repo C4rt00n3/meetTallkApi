@@ -1,0 +1,46 @@
+{
+    "message": [
+        {
+            "target": {
+                "gender": "M",
+                "provider": "app",
+                "birthDate": "2007-07-29T03:00:00.000Z",
+                "location": {
+                    "latitude": "37.4219983",
+                    "longitude": "-122.084",
+                    "state": "California",
+                    "city": "Mountain View",
+                    "country": "Estados Unidos"
+                },
+                "name": "Rafael Felipe"
+            },
+            "value": {
+                "latitude": "37.4219983",
+                "longitude": "-122.084",
+                "state": "California",
+                "city": "Mountain View",
+                "country": "Estados Unidos"
+            },
+            "property": "location",
+            "children": [
+                {
+                    "target": {
+                        "latitude": "37.4219983",
+                        "longitude": "-122.084",
+                        "state": "California",
+                        "city": "Mountain View",
+                        "country": "Estados Unidos"
+                    },
+                    "value": "California",
+                    "property": "state",
+                    "children": [],
+                    "constraints": {
+                        "isEnum": "state must be one of the following values: AC, AL, AP, AM, BA, CE, DF, ES, GO, MA, MG, MS, MT, PA, PB, PE, PI, PR, RJ, RN, RO, RR, RS, SC, SE, SP, TO"
+                    }
+                }
+            ]
+        }
+    ],
+    "error": "Bad Request",
+    "statusCode": 400
+}

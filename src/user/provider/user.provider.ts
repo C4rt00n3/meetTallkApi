@@ -17,7 +17,7 @@ export abstract class UserProvider {
 
     abstract delete(uuid: string): Promise<void>
 
-    abstract findByEmail(email: string):Promise<UserEntity | null>
+    abstract findByEmail(email: string):Promise<User | null>
 
-    abstract randomUser(user: User): Promise<User | null>
+    abstract randomUser(user: UserEntity): Promise<User | null>
 }

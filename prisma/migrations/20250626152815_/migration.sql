@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE `chat` ADD COLUMN `fav` BOOLEAN NOT NULL DEFAULT false;

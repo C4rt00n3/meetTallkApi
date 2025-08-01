@@ -1,11 +1,10 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { MessageType } from "@prisma/client";
-import { ArrayNotEmpty, IsArray, IsDate, IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUrl, IsUUID } from "class-validator";
+import { ArrayNotEmpty, IsArray, IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
 
 export class CreateMessageDto {
   @ApiProperty({ example: 'Olá, tudo bem?' })
   @IsString()
-  @IsNotEmpty()
   text: string;
 
   @ApiProperty({ example: "2025-06-21T14:10:00.000Z", required: false })
@@ -17,16 +16,9 @@ export class CreateMessageDto {
   @IsEnum(MessageType)
   @IsOptional()
   type: MessageType = MessageType.TEXT;
-
-  @ApiProperty({ required: false, example: 'https://example.com/imagem.jpg' })
-  @IsString()
-  @IsOptional()
-  @IsUrl()
-  url?: string;
-
+  
   @ApiProperty({ example: 'uuid-do-recebedor' })
   @IsString()
-  @IsUUID()
   @IsNotEmpty()
   receiverId: string;
 

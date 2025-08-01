@@ -7,7 +7,7 @@ export const GetUser = createParamDecorator(async (data: unknown, ctx: Execution
     const request = ctx.switchToHttp().getRequest();
     return await prismaService.user.findUniqueOrThrow({
         where: {
-            uuid: request.user.sub
+            uuid: request.user.sub || request.user.userId
         },
         include: {
             location: true,

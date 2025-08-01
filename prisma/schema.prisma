@@ -19,40 +19,10 @@ model Location {
   @@map("localizacao")
 }
 
-enum State {
-  AC
-  AL
-  AP
-  AM
-  BA
-  CE
-  DF
-  ES
-  GO
-  MA
-  MG
-  MS
-  MT
-  PA
-  PB
-  PE
-  PI
-  PR
-  RJ
-  RN
-  RO
-  RR
-  RS
-  SC
-  SE
-  SP
-  TO
-}
-
 model User {
   uuid             String            @id @default(uuid())
   name             String            @map("nome")
-  age              Int               @map("idade")
+  birthDate        DateTime
   gender           Gender?           @default(M) @map("sexo")
   locationId       String?           @map("localizacao_id")
   location         Location?         @relation(fields: [locationId], references: [uuid])
@@ -62,17 +32,42 @@ model User {
   blocks           Block[]
   profileImages    ImageProfile[]
   messageImages    ImageMessage[]
-  preference       Preference?        @relation(fields: [preferenceUuid], references: [uuid])
-  preferenceUuid   String? @unique
+  createAt         DateTime          @default(now())
+  updateAt         DateTime          @updatedAt
+  provider        Provider @default(app)
 
+  preference       Preference?       
+  privacyUser   PrivacyUser? 
+  
   @@map("usuario")
 }
+
+enum Provider {
+  google
+  app
+}
+
+model PrivacyUser {
+  uuid       String  @id @default(uuid())
+  noMarkRead Boolean @default(false)
+  imageBreak Int     @default(0)
+  talkBreak  Int     @default(0)
+  
+  // Campo de relação
+  user       User    @relation(fields: [userUuid], references: [uuid])
+  
+  // A chave estrangeira agora é do tipo String, correspondendo a User.uuid.
+  // Usamos @unique para garantir a relação de 1:1.
+  userUuid   String  @unique 
+}
+
 
 model Preference {
   uuid   String @id @default(uuid())
   gender Gender
   maxAge Int
-  user User[]
+  user       User    @relation(fields: [userUuid], references: [uuid])
+  userUuid   String  @unique 
 }
 
 model Block {
@@ -85,9 +80,9 @@ model Block {
 }
 
 model Auth {
-  uuid     String @id @default(uuid())
-  email    String @unique
-  password String
+  uuid     String  @id @default(uuid())
+  email    String  @unique
+  password String?
   user     User?
 
   @@map("autenticacao")
@@ -96,6 +91,7 @@ model Auth {
 enum Gender {
   F
   M
+  O
 }
 
 model Chat {
@@ -124,7 +120,6 @@ model Message {
   uuid           String       @id @default(uuid())
   text           String
   type           MessageType? @default(TEXT) @map("tipo")
-  url            String?
   chatId         String       @map("chat_uuid")
   createdAt      DateTime     @default(now())
   senderId       String       @map("sender_id")
@@ -139,9 +134,21 @@ model Message {
   isUpdate  Boolean   @default(false)
   updateAt  DateTime? @updatedAt
 
-  countUpdate Int @default(0)
+  countUpdate  Int           @default(0)
+  ImageMessage ImageMessage?
 
   @@map("message")
+}
+
+model ImageMessage {
+  uuid        String  @id @default(uuid())
+  src         Bytes
+  user        User?   @relation(fields: [userUuid], references: [uuid])
+  userUuid    String?
+  message     Message @relation(fields: [messageUuid], references: [uuid])
+  messageUuid String  @unique
+
+  @@map("image_message")
 }
 
 enum MessageType {
@@ -158,16 +165,11 @@ model ImageProfile {
   user     User?   @relation(fields: [userUuid], references: [uuid])
   userUuid String?
 
-  isPrimary Boolean @default(false)
+  createAt DateTime @default(now())
+  updateAt DateTime @updatedAt
+
+  slot Int
 
   @@map("image_perfil")
 }
 
-model ImageMessage {
-  uuid     String  @id @default(uuid())
-  src      Bytes
-  user     User?   @relation(fields: [userUuid], references: [uuid])
-  userUuid String?
-
-  @@map("image_message")
-}

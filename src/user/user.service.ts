@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { CreateUserDto, FindUserParams, GenericFilter, UpdateUserDto } from './dto/user.dto';
-import { UserEntity } from './entities/user.entity';
 import { UserProvider } from './provider/user.provider';
+import { User } from '@prisma/client';
+import { UserEntity } from './entities/user.entity';
 
 @Injectable()
 export class UserService {
@@ -9,7 +10,7 @@ export class UserService {
 
     find = (uuid: string) => this.provider.findUnique(uuid)
 
-    findMany = (params: FindUserParams, user: UserEntity, filter: GenericFilter) => this.provider.findMany(params, user, filter)
+    findMany = (params: FindUserParams, user: User, filter: GenericFilter) => this.provider.findMany(params, user, filter)
 
     create = (body: CreateUserDto) => this.provider.create(body)
 

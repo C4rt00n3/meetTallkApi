@@ -1,9 +1,10 @@
-import { PrismaService } from "src/prisma.service";
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, User } from "@prisma/client";
-import { CreateUserDto, FindUserParams, GenericFilter, PreferenceDto, UpdateUserDto } from "src/user/dto/user.dto";
+import { CreatePrivacyUserDto, CreateUserDto, FindUserParams, GenericFilter, UpdateUserDto } from "src/user/dto/user.dto";
 import { UserEntity } from "src/user/entities/user.entity";
 import { UserProvider } from "../user.provider";
+import { ChatGateway } from "src/gateway/chat.gateway";
+import { PrismaService } from "src/prisma.service";
 
 
 @Injectable()
@@ -11,7 +12,25 @@ export default class UserClass implements UserProvider {
     /**
      * Classe responsável por gerenciar operações CRUD no modelo Usuario utilizando o PrismaService.
      */
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly chatGetawy: ChatGateway
+    ) { }
+
+    async onModuleInit() {
+        console.log('Inicializando middleware do Prisma para User...');
+        this.observerUsres();
+    }
+
+    async observerUsres() {
+        this.prisma.$use(async (params, next) => {
+            if (params.model === 'User' && (params.action === 'update' || params.action === 'create' || params.action === 'delete')) {
+                this.chatGetawy.notifyContactsOfUserUpdate(params.args.where?.uuid, params.action, params.args.data)
+            }
+            const result = await next(params)
+            return result
+        })
+    }
 
     /**
      * Busca um usuário que corresponda aos critérios fornecidos.
@@ -51,7 +70,9 @@ export default class UserClass implements UserProvider {
      * @param params - Parâmetros de busca definidos na interface FindUsariosParams.
      * @returns Uma lista de usuários encontrados ou uma lista vazia caso nenhum corresponda aos critérios.
      */
-    async findMany({ name }: FindUserParams, user: UserEntity, filter: GenericFilter): Promise<User[]> {
+    async findMany({ name }: FindUserParams, userParma: User, filter: GenericFilter): Promise<User[]> {
+        const user = userParma as unknown as UserEntity;
+
         const users = await this.prisma.user.findMany({
             where: {
                 name: { contains: (name || "").trim() },
@@ -65,7 +86,8 @@ export default class UserClass implements UserProvider {
                         uuid: true
                     }
                 },
-                preference: true
+                preference: true,
+                privacyUser: true
             }
         });
 
@@ -100,26 +122,42 @@ export default class UserClass implements UserProvider {
         auth,
         location,
         preference,
+        privacyUser,
         ...body
     }: CreateUserDto): Promise<User> {
+        const user = await this.findByEmail(auth.email)
+        const privacy = new CreatePrivacyUserDto()
+
+        if (user)
+            throw new BadRequestException("Usuário já existe. faça login")
         return await this.prisma.user.create({
             data: {
                 ...body,
                 auth: { create: { ...auth } },
+                privacyUser: privacyUser ? {
+                    create: {
+                        ...privacyUser
+                    }
+                } : {
+                    create: {
+                        ...privacy
+                    }
+                },
                 location: location?.longitude && location?.latitude
                     ? { create: location }
                     : undefined,
-                preference: preference ? {
+                preference: {
                     create: {
-                        gender: preference.gender,
-                        maxAge: preference.maxAge
+                        gender: preference?.gender || "O",
+                        maxAge: preference?.maxAge || 100
                     }
-                } : undefined
+                } 
             },
             include: {
                 location: true,
                 profileImages: true,
-                preference: true
+                preference: true,
+                privacyUser: true
             }
         });
     }
@@ -132,7 +170,7 @@ export default class UserClass implements UserProvider {
      * @throws NotFoundException - Se o usuário não for encontrado pelo UUID.
      */
     async update(
-        { auth, location, preference, ...data }: UpdateUserDto, // 'data' contém name, age, gender
+        { auth, location, preference, privacyUser, ...data }: UpdateUserDto, // 'data' contém name, age, gender
         uuid: string
     ): Promise<User | null> {
         const user = await this.findUnique(uuid);
@@ -141,13 +179,23 @@ export default class UserClass implements UserProvider {
             throw new NotFoundException("Usuário não encontrado!");
         }
         if (data.name === undefined) delete data.name;
-        if (data.age === undefined) delete data.age;
+        if (data.birthDate === undefined) delete data.birthDate;
         if (data.gender === undefined) delete data.gender;
 
         return await this.prisma.user.update({
             where: { uuid },
             data: {
                 ...data,
+                privacyUser: privacyUser ? {
+                    upsert: {
+                        create: {
+                            ...privacyUser
+                        },
+                        update: {
+                            ...privacyUser
+                        }
+                    }
+                } : undefined,
                 preference: preference ? {
                     upsert: {
                         create: {
@@ -184,7 +232,8 @@ export default class UserClass implements UserProvider {
             },
             include: {
                 location: true,
-                preference: true
+                preference: true,
+                privacyUser: true
             }
         });
     }
@@ -206,7 +255,8 @@ export default class UserClass implements UserProvider {
                             uuid: true
                         }
                     },
-                    preference: true
+                    preference: true,
+                    privacyUser: true
                 }
             });
         } catch (error) {
@@ -242,7 +292,7 @@ export default class UserClass implements UserProvider {
      * @param email - Endereço de e-mail do usuário.
      * @returns Uma instância de UsuarioEntity ou null se não encontrado.
      */
-    async findByEmail(email: string): Promise<UserEntity | null> {
+    async findByEmail(email: string): Promise<User | null> {
         const user = await this.prisma.user.findFirst({
             where: {
                 auth: {
@@ -256,7 +306,8 @@ export default class UserClass implements UserProvider {
                         uuid: true
                     }
                 },
-                preference: true
+                preference: true,
+                privacyUser: true
             }
         });
 
@@ -264,26 +315,48 @@ export default class UserClass implements UserProvider {
             return null;
         }
 
-        return user as unknown as UserEntity;
+        return user;
     }
-
+    
+   
     /**
-  * Busca um usuário aleatório no banco de dados, aplicando filtros de preferência se fornecidos.
-  * Garante que o usuário retornado não seja o mesmo que fez a requisição,
-  * nem qualquer outro UUID fornecido na lista de exclusão.
-  *
-  * @param {object} params - Objeto contendo as preferências do usuário logado, seu próprio UUID, e uma lista de UUIDs a serem excluídos.
-  * @param {PreferenceDto} params.preference - As preferências do usuário.
-  * @param {string} params.uuid - O UUID do usuário que está logado, para excluí-lo da busca.
-  * @param {string[]} [params.excludeUuids] - Uma lista opcional de UUIDs adicionais a serem excluídos da busca.
-  * @returns {Promise<User | null>} Um usuário aleatório que corresponde às preferências e não está nas listas de exclusão, ou `null` se nenhum for encontrado.
-  */
-    async randomUser({ preference, uuid }: UserEntity): Promise<User | null> {
+     * Busca um usuário aleatório no banco de dados, aplicando filtros de preferência se fornecidos.
+     * Garante que o usuário retornado não seja o mesmo que fez a requisição,
+     * nem qualquer outro UUID fornecido na lista de exclusão.
+     *
+     * @param {object} params - Objeto contendo as preferências do usuário logado, seu próprio UUID, e uma lista de UUIDs a serem excluídos.
+     * @param {PreferenceDto} params.preference - As preferências do usuário.
+     * @param {string} params.uuid - O UUID do usuário que está logado, para excluí-lo da busca.
+     * @param {string[]} [params.excludeUuids] - Uma lista opcional de UUIDs adicionais a serem excluídos da busca.
+     * @returns {Promise<User | null>} Um usuário aleatório que corresponde às preferências e não está nas listas de exclusão, ou `null` se nenhum for encontrado.
+     */
+    async randomUser(currentUser: UserEntity): Promise<User | null> {
         try {
-            const queryParts: Array<string | Prisma.Sql> = [Prisma.sql`SELECT * FROM usuario`];
+            // Primeiro, busca o usuário completo com suas preferências
+            const userWithPreference = await this.prisma.user.findUnique({
+                where: { uuid: currentUser.uuid },
+                include: {
+                    preference: true
+                }
+            });
+
+            if (!userWithPreference || !userWithPreference.preference) {
+                // Se o usuário ou suas preferências não forem encontradas, não é possível filtrar
+                return null;
+            }
+
+            const preference = userWithPreference.preference;
+            const uuid = userWithPreference.uuid;
             const conditions: Array<Prisma.Sql> = [];
 
-            const excludeUuids = await this.prisma.block.findMany({
+            // Adiciona o UUID do usuário logado à lista de exclusão
+            const allUuidsToExclude = new Set<string>();
+            if (uuid) {
+                allUuidsToExclude.add(uuid);
+            }
+            
+            // Busca e adiciona os usuários bloqueados à lista de exclusão
+            const blockedUsers = await this.prisma.block.findMany({
                 where: {
                     userId: uuid
                 },
@@ -294,52 +367,72 @@ export default class UserClass implements UserProvider {
                         }
                     }
                 }
-            })
-
-            const allUuidsToExclude = new Set<string>();
-            if (uuid) {
-                allUuidsToExclude.add(uuid);
-            }
-            if (excludeUuids && excludeUuids.length > 0) {
-                excludeUuids.forEach(block => allUuidsToExclude.add(block.blockedUser.uuid));
+            });
+            if (blockedUsers && blockedUsers.length > 0) {
+                blockedUsers.forEach(block => allUuidsToExclude.add(block.blockedUser.uuid));
             }
 
             // Se houver UUIDs para excluir, adicione a condição NOT IN
             if (allUuidsToExclude.size > 0) {
-                // Converte o Set de volta para um array para usar com Prisma.join
                 const uuidsSql = Array.from(allUuidsToExclude).map(id => Prisma.sql`${id}`);
-                conditions.push(Prisma.sql`uuid NOT IN (${Prisma.join(uuidsSql)})`);
+                conditions.push(Prisma.sql`\`uuid\` NOT IN (${Prisma.join(uuidsSql)})`);
             }
 
             if (preference) {
-                if (preference.gender) {
-                    conditions.push(Prisma.sql`sexo = ${preference.gender}`);
+                // Modificado para ignorar o filtro de gênero se a preferência for 'O'
+                if (preference.gender && preference.gender !== 'O') {
+                    conditions.push(Prisma.sql`\`sexo\` = ${preference.gender}`);
                 }
+                
+                // Calcula a idade a partir da data de nascimento ("birthDate") para filtrar
+                // A função `TIMESTAMPDIFF` do MySQL é mais precisa para calcular a idade
+                const ageCalculationSql = Prisma.sql`TIMESTAMPDIFF(YEAR, \`birthDate\`, CURDATE())`;
 
-                if (preference.maxAge !== undefined && preference.maxAge !== null) {
-                    conditions.push(Prisma.sql`idade <= ${preference.maxAge}`);
+                if (preference.maxAge) {
+                    conditions.push(Prisma.sql`${ageCalculationSql} <= ${preference.maxAge}`);
                 }
-
+                
                 // Garante que a idade mínima seja 18
-                conditions.push(Prisma.sql`idade >= 18`);
+                conditions.push(Prisma.sql`${ageCalculationSql} >= 17`);
             }
 
-            // Adiciona a cláusula WHERE apenas se houver alguma condição
+            // Constrói a consulta para buscar um único UUID aleatório
+            const queryParts: Array<string | Prisma.Sql> = [Prisma.sql`SELECT \`uuid\` FROM \`usuario\``];
             if (conditions.length > 0) {
                 queryParts.push(Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`);
             }
-
+            // Corrigido para usar a função de ordenação aleatória RAND() do MySQL
             queryParts.push(Prisma.sql`ORDER BY RAND() LIMIT 1`);
-
             const finalQuery = Prisma.join(queryParts, ' ');
 
-            const randomUsers = await this.prisma.$queryRaw<User[]>(finalQuery);
+            // Executa a consulta para obter o UUID aleatório
+            const randomUuidResult = await this.prisma.$queryRaw<{ uuid: string }[]>(finalQuery);
 
-            return randomUsers.length > 0 ? randomUsers[0] : null;
+            // Se nenhum UUID for encontrado, retorna null
+            if (randomUuidResult.length === 0) {
+                return null;
+            }
+            const randomUuid = randomUuidResult[0].uuid;
+
+            // Busca o usuário completo usando o UUID e inclui todas as relações necessárias
+            return await this.prisma.user.findUnique({
+                where: { uuid: randomUuid },
+                include: {
+                    location: true,
+                    preference: true,
+                    privacyUser: true,
+                    profileImages: {
+                        select: {
+                            uuid: true,
+                            slot: true
+                        }
+                        
+                    },
+                }
+            });
         } catch (error) {
             console.error("Erro ao buscar usuário aleatório com preferências:", error);
             throw error;
         }
     }
-
 }

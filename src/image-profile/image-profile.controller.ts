@@ -1,6 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, MaxFileSizeValidator, ParseFilePipe, FileTypeValidator, UseGuards, Res, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Delete, UseInterceptors, UploadedFile, MaxFileSizeValidator, ParseFilePipe, FileTypeValidator, UseGuards, Res, BadRequestException } from '@nestjs/common';
 import { ImageProfileService } from './image-profile.service';
-import { UpdateImageProfileDto } from './dto/update-image-profile.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { GetUser } from 'src/auth/get-user.decorator';
@@ -14,7 +13,7 @@ import * as sharp from 'sharp';
 export class ImageProfileController {
   constructor(private readonly imageProfileService: ImageProfileService) { }
 
-  @Post()
+  @Post(":slot")
   @UseGuards(AuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async uploadImage(
@@ -31,10 +30,14 @@ export class ImageProfileController {
       }),
     )
     file: Express.Multer.File,
+    @Param('slot') slot: string,
     @GetUser() user: User,
   ) {
     const optimizedFile = await this.optimizedFile(file)
-    return await this.imageProfileService.create(optimizedFile, user);
+    if(+slot > 6 || +slot == 0) {
+      throw new BadRequestException("Slot limitado 1..5")
+    }
+    return await this.imageProfileService.create(optimizedFile, user, +slot);
   }
 
   async optimizedFile(file: Express.Multer.File) {
@@ -89,32 +92,9 @@ export class ImageProfileController {
       // Envia o buffer diretamente
       res.end(imageBuffer);
     } catch (error) {
+      console.log(error)
       res.status(500).send('Erro interno do servidor');
     }
-  }
-
-  @Patch(':id')
-  @UseGuards(AuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
-  async update(
-    @Param('id') id: string,
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 5 }),
-          new FileTypeValidator({ fileType: /^image\/(jpeg|png|gif|webp)$/ }),
-        ],
-        fileIsRequired: true,
-        exceptionFactory: (errors) => {
-          return new BadRequestException(errors);
-        },
-      }),
-    )
-    file: Express.Multer.File,
-    @GetUser() user: User,
-  ) {
-    const optimizedFile = await this.optimizedFile(file)
-    return await this.imageProfileService.update(id, optimizedFile, user);
   }
 
   @Delete(':uuid')

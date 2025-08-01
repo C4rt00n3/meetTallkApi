@@ -9,7 +9,7 @@ import { BlockModule } from './block/block.module';
 import { ImageProfileModule } from './image-profile/image-profile.module';
 
 @Module({
-  imports: [UsuarioModule, ChatModule, AuthModule, MensageModule, BlockModule, ImageProfileModule],
+  imports: [UsuarioModule, ChatModule, AuthModule, MensageModule, ImageProfileModule, BlockModule],
   controllers: [AppController],
   providers: [AppService],
 })
