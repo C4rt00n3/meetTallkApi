@@ -29,4 +29,11 @@ export class AuthController {
   async auth(@Req() req: Request) { 
     return this.authService.singInGoogle(req["user"])
   }
+
+  
+  @HttpCode(HttpStatus.OK)
+  @Post('refresh')
+  async refreshToken(@Body('refreshToken') refreshToken: string) {
+    return this.authService.refreshToken(refreshToken);
+  }
 }

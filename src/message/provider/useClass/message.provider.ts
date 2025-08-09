@@ -337,6 +337,7 @@ async update(
                 locationId: true,
                 gender: true,
                 birthDate: true,
+                privacyUser: true,
                 profileImages: {
                   select: {
                     uuid: true,
